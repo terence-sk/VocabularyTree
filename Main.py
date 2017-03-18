@@ -1,10 +1,9 @@
 import os
 import cv2
 from TreeObject import TreeObject
+from KeyValuePair import KeyValuePair
 from Pic import Pic
 import numpy as np
-from anytree import Node, RenderTree
-from matplotlib import pyplot as plt
 
 
 def loadPics():
@@ -68,7 +67,6 @@ if __name__ == '__main__':
 
     # Toto je moj root (Descriptors with paths to corresponding images)
     tree = []
-    #clusters = []
     descriptors = []
     paths = []
     pics = loadPics()
@@ -77,8 +75,23 @@ if __name__ == '__main__':
         kp, desc = getKeypointDescriptorsTuple(pic.img)
         descriptors.append(desc)
 
+        # aby som vedel ktory deskriptor patri ku ktoremu obrazku
+        for i in range(0, len(desc)):
+            paths.append(pic.path)
+
+
     # spoji list 5tich poli (5 obrazkov po X*128)
     descriptors = np.vstack(descriptors)
+    paths = np.asarray(paths)
 
-    ret, label, center = getClusteredData(descriptors)
-    print(label)
+    ret, labels, center = getClusteredData(descriptors)
+
+    for i in range(0, NUM_OF_CLUSTERS):
+        desc = descriptors[labels.ravel() == i]
+        path = paths[labels.ravel() == i]
+        kvp = KeyValuePair(path, desc)
+
+        tree.append(TreeObject(kvp, i))
+
+
+    print("breakpoint")
