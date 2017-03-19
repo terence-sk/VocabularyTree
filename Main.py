@@ -35,7 +35,7 @@ def getKeypointDescriptorsTuple(img):
 
     return keypoints, descriptors
 
-
+MINIMUM_KEYPOINTS = 10
 NUM_OF_CLUSTERS = 10
 NUM_OF_LEVELS = 3
 
@@ -59,6 +59,32 @@ def getClusteredData(descriptors):
                                     flags=cv2.KMEANS_RANDOM_CENTERS)
 
     return ret, label, center
+
+
+def create_tree(item):
+
+        # Not sure about this one but I'll just let it be here for a while
+    if len(item.getkvps().getvalue()) <= 10:
+        return
+
+    # bud tu
+    # create_tree(item)
+
+    ret, labels, center = getClusteredData(item.getkvps().getvalue())
+
+    descriptors = item.getkvps().getvalue()
+    paths = item.getkvps().getkey()
+
+    for i in range(0, NUM_OF_CLUSTERS):
+
+        desc = descriptors[labels.ravel() == i]
+        path = paths[labels.ravel() == i]
+        kvp = KeyValuePair(path, desc)
+
+        item.add_child(TreeObject(kvp, i))
+
+        # alebo tu
+        create_tree(item.get_child(i))
 
 
 # starting point
@@ -93,5 +119,9 @@ if __name__ == '__main__':
 
         tree.append(TreeObject(kvp, i))
 
+    create_tree(tree[1])
+
+    #for i in tree:
+    #    create_tree(i)
 
     print("breakpoint")

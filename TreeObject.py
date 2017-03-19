@@ -25,3 +25,6 @@ class TreeObject:
     def add_child(self, node):
         assert isinstance(node, TreeObject)
         self.children.append(node)
+
+    def get_child(self, index):
+        return self.children[index]
