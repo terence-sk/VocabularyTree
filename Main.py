@@ -6,21 +6,26 @@ from Pic import Pic
 import numpy as np
 
 
-def loadPics():
-
-    currentDir = os.getcwd()
-    picDir = currentDir + "/pics"
-
-    pics = []
-
-    for filename in os.listdir(picDir):
-        img = cv2.imread(picDir + "/" + filename, cv2.IMREAD_GRAYSCALE)
-        pics.append(Pic(filename, img))
-
-    return pics
+MINIMUM_KEYPOINTS = 10
+NUM_OF_CLUSTERS = 10
+NUM_OF_LEVELS = 3
 
 
-def getKeypointDescriptorsTuple(img):
+def load_pics():
+
+    current_dir = os.getcwd()
+    pics = current_dir + "/pics"
+
+    pic_list = []
+
+    for filename in os.listdir(pics):
+        img = cv2.imread(pics + "/" + filename, cv2.IMREAD_GRAYSCALE)
+        pic_list.append(Pic(filename, img))
+
+    return pic_list
+
+
+def get_keypoint_descriptors_tuple(img):
     # creating MSER keypoint detector
     mser = cv2.MSER_create()
 
@@ -35,13 +40,10 @@ def getKeypointDescriptorsTuple(img):
 
     return keypoints, descriptors
 
-MINIMUM_KEYPOINTS = 10
-NUM_OF_CLUSTERS = 10
-NUM_OF_LEVELS = 3
 
-
-def getClusteredData(descriptors):
-    #  10 = Flag to specify the number of times the algorithm is executed using different initial labellings. The algorithm returns the labels that yield the best compactness.
+def get_clustered_data(descs):
+    #  10 = Flag to specify the number of times the algorithm is executed using different initial labellings.
+    # The algorithm returns the labels that yield the best compactness.
     # This compactness is returned as output. (?)
     # 1.0 = accuracy
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
@@ -54,23 +56,19 @@ def getClusteredData(descriptors):
     # center = list of 6 arrays of length 128 - descriptors of cluster centers
     # ret = It is the sum of squared distance from each point to their corresponding centers.
     # label = Label of keypoint to which cluster does keypoint belong
-    ret, label, center = cv2.kmeans(data=descriptors, K=NUM_OF_CLUSTERS, bestLabels=None, criteria=criteria,
-                                    attempts=10,
-                                    flags=cv2.KMEANS_RANDOM_CENTERS)
+    ret, labels, centers = cv2.kmeans(data=descs, K=NUM_OF_CLUSTERS, bestLabels=None, criteria=criteria, attempts=10,
+                                      flags=cv2.KMEANS_RANDOM_CENTERS)
 
-    return ret, label, center
+    return ret, labels, centers
 
 
 def create_tree(item):
 
-        # Not sure about this one but I'll just let it be here for a while
+    # Not sure about this one but I'll just let it be here for a while
     if len(item.getkvps().getvalue()) <= 10:
         return
 
-    # bud tu
-    # create_tree(item)
-
-    ret, labels, center = getClusteredData(item.getkvps().getvalue())
+    ret, labels, center = get_clustered_data(item.getkvps().getvalue())
 
     descriptors = item.getkvps().getvalue()
     paths = item.getkvps().getkey()
@@ -83,34 +81,37 @@ def create_tree(item):
 
         item.add_child(TreeObject(kvp, i))
 
-        # alebo tu
         create_tree(item.get_child(i))
 
-
-# starting point
-if __name__ == '__main__':
+    # print(len(item.getkvps().getkey()))
 
 
+def main():
     # Toto je moj root (Descriptors with paths to corresponding images)
     tree = []
     descriptors = []
     paths = []
-    pics = loadPics()
+    pics = load_pics()
 
     for pic in pics:
-        kp, desc = getKeypointDescriptorsTuple(pic.img)
+        kp, desc = get_keypoint_descriptors_tuple(pic.img)
+
+        if kp is None or desc is None:
+            print("No descriptors for " + pic.path)
+            continue
+
         descriptors.append(desc)
 
         # aby som vedel ktory deskriptor patri ku ktoremu obrazku
         for i in range(0, len(desc)):
             paths.append(pic.path)
 
-
-    # spoji list 5tich poli (5 obrazkov po X*128)
+    # spoji list x poli (obrazkov) pricom kazde pole obsahuje
+    # samo o sebe y descriptorov
     descriptors = np.vstack(descriptors)
     paths = np.asarray(paths)
 
-    ret, labels, center = getClusteredData(descriptors)
+    ret, labels, center = get_clustered_data(descriptors)
 
     for i in range(0, NUM_OF_CLUSTERS):
         desc = descriptors[labels.ravel() == i]
@@ -119,9 +120,11 @@ if __name__ == '__main__':
 
         tree.append(TreeObject(kvp, i))
 
-    create_tree(tree[1])
+    for node in tree:
+        create_tree(node)
 
-    #for i in tree:
-    #    create_tree(i)
 
-    print("breakpoint")
+# starting point
+if __name__ == '__main__':
+    main()
+    print("DONE")

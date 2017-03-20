@@ -28,3 +28,6 @@ class TreeObject:
 
     def get_child(self, index):
         return self.children[index]
+
+    def get_child_all(self):
+        return self.children
