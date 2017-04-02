@@ -1,37 +1,22 @@
 import os
 import cv2
 from TreeObject import TreeObject
+from TreeTypeEnum import TreeTypeEnum
 from KeyValuePair import KeyValuePair
 from Pic import Pic
 import numpy as np
-import math
 
 MINIMUM_KEYPOINTS = 10
 NUM_OF_CLUSTERS = 10
 NUM_OF_LEVELS = 3
 NUM_OF_PICS = -1
-
-
-def DEBUG_load_two():
-    current_dir = os.getcwd()
-    pics = current_dir + "/pics"
-
-    pic_list = []
-    img = cv2.imread(pics + "/" + "house1.jpg", cv2.IMREAD_GRAYSCALE)
-    pic_list.append(Pic("house1.jpg", img))
-
-    img = cv2.imread(pics + "/" + "house2.jpg", cv2.IMREAD_GRAYSCALE)
-    pic_list.append(Pic("house2.jpg", img))
-
-    global NUM_OF_PICS
-    NUM_OF_PICS = len(pic_list)
-
-    return pic_list
+TREE_TYPE = None
 
 
 def load_pics():
 
     current_dir = os.getcwd()
+
     pics = current_dir + "/pics"
 
     pic_list = []
@@ -83,7 +68,7 @@ def get_clustered_data(descs):
     return compactness, labels, centers
 
 
-def create_tree(item):
+def tree_add_node(item):
 
     # Not sure about this one but I'll just let it be here for a while
     if len(item.get_kvps().get_value()) <= 10:
@@ -104,17 +89,18 @@ def create_tree(item):
 
         item.add_child(TreeObject(kvp, compactness=compactness, label=i, center=center))
 
-        create_tree(item.get_child(i))
+        tree_add_node(item.get_child(i))
 
-    # print(len(item.getkvps().getkey()))
+    # item.to_string()
 
 
-def main():
+def create_tree():
     # Toto je moj root (Descriptors with paths to corresponding images)
     tree = []
     descriptors = []
     paths = []
-    pics = DEBUG_load_two()
+
+    pics = load_pics()
 
     for pic in pics:
         kp, desc = get_keypoint_descriptors_tuple(pic.img)
@@ -145,12 +131,27 @@ def main():
         tree.append(TreeObject(kvp, compactness=compactness, label=i, center=center))
 
     for node in tree:
-        create_tree(node)
+        tree_add_node(node)
 
     print('main ends')
+    return tree
 
+
+def get_query_image_descriptors():
+    query_path = os.getcwd() + "/query_pic/query_tux_iny_tux.jpg"
+    query_img = cv2.imread(query_path, cv2.IMREAD_GRAYSCALE)
+    kp, desc = get_keypoint_descriptors_tuple(query_img)
+
+    return desc
 
 # starting point
 if __name__ == '__main__':
-    main()
+
+    global TREE_TYPE
+
+    TREE_TYPE = TreeTypeEnum.CREATE
+    database = create_tree()
+
+    descriptors = get_query_image_descriptors()
+
     print("DONE")

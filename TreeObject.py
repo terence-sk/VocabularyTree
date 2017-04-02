@@ -1,6 +1,7 @@
 from KeyValuePair import KeyValuePair
 import numpy as np
 import math
+from pprint import pprint
 
 
 class TreeObject:
@@ -27,8 +28,11 @@ class TreeObject:
 
         self.children = []
         self.kvp_n_of_desc_of_img = []
-        self.weight = -1
-        self.num_of_all_desc = -1
+        self.weight = 0 # = w
+        self.num_of_all_desc = 0 # = m
+
+        self.d = 0 # = d = m * w
+        self.n = 0 # LEN pri query strome. Pocet deskriptorov ktore presli tymto uzlom
 
         if children is not None:
             for child in children:
@@ -50,6 +54,9 @@ class TreeObject:
         assert isinstance(node, TreeObject)
         self.children.append(node)
 
+    def visit(self):
+        self.n += 1
+
     def setup(self, num_of_pics):
 
         # kazdy uzol vie pre kazdy obrazok pocet vsetkych deskriptorov toho obrazku
@@ -59,9 +66,18 @@ class TreeObject:
             self.kvp_n_of_desc_of_img.append(KeyValuePair(paths[i], counts[i]))
 
         # kazdy uzol bude mat vahu w = ln(pocet_vsetkych_obrazkov_v_databaze / pocet_obrazkov_ktore_obsahuju_dany_deskriptor)
-        # malo by to odpovedat pocet obrazkov asociovanych s danym uzlom
+        # pocet_obrazkov_ktore_obsahuju_dany_deskriptor = malo by to odpovedat pocet obrazkov asociovanych s danym uzlom
         # pocet kvp = pocet obrazkov, kedze je to roztriedene
         self.weight = math.log(num_of_pics / len(self.kvp_n_of_desc_of_img))
 
         # kazdy uzol ma m (rovne suctu m kazdeho obrazka) (pocet vsetkych desc)
         self.num_of_all_desc = len(self.kvps.get_value())
+
+        # na kazdom uzle je mozne po vytvoreni stromu predpocitat d = m * w
+        # TODO: m = dufam ze to 'm' ktore je rovne suctu m kazdeho obrazka
+        self.d = self.weight * self.num_of_all_desc
+
+    def to_string(self):
+        print("<<<<<<<<<<<<<<")
+        pprint(vars(self))
+        print(">>>>>>>>>>>>>>")
