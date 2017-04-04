@@ -47,6 +47,9 @@ class TreeObject:
     def get_child(self, index):
         return self.children[index]
 
+    def get_child_all(self):
+        return self.children
+
     def get_weight(self):
         return self.weight
 
@@ -56,6 +59,9 @@ class TreeObject:
 
     def visit(self):
         self.n += 1
+
+    def get_center_list(self):
+        return self.center
 
     def setup(self, num_of_pics):
 

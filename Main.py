@@ -5,6 +5,7 @@ from TreeTypeEnum import TreeTypeEnum
 from KeyValuePair import KeyValuePair
 from Pic import Pic
 import numpy as np
+import sys
 
 MINIMUM_KEYPOINTS = 10
 NUM_OF_CLUSTERS = 10
@@ -17,7 +18,8 @@ def load_pics():
 
     current_dir = os.getcwd()
 
-    pics = current_dir + "/pics"
+    #pics = current_dir + "/pics" TODO Revert
+    pics = current_dir + "/DEBUG_test_images_few"
 
     pic_list = []
 
@@ -144,6 +146,54 @@ def get_query_image_descriptors():
 
     return desc
 
+
+def get_closest_node(database, descriptor):
+
+    for node in database:
+        # najmensia vzdialenost medzi centrom a deskriptorom
+        lowest = sys.float_info.max
+        index = -1
+
+        # uzly na rovnakej urovni stromu mam v list-e, takisto aj ich centra
+        center_list = node.get_center_list()
+
+        # porovnavam jednotlive centra s deskriptorom
+        # a hladam take ktoremu je najblizsi
+        for idx, center in enumerate(center_list):
+            # euclidean distance
+            dist = abs(np.linalg.norm(center - descriptor))
+            if dist < lowest:
+                lowest = dist
+                index = idx
+                database[index].visit()
+
+        # prechadzame uzly pokial maju deti
+        if len(database[index].get_child_all()) != 0:
+            database = database[index].get_child_all()
+        # dosiahli sme leaf node
+        # uzol uz deti nema, ale moze mat viac ako jeden descriptor
+        else:
+            lowest = sys.float_info.max
+            most_similar_object = None
+
+            # ak ostal uz len jeden KVP alebo su vsetky KVP z jedneho obrazku, mozme rovno vratit jeho nazov
+            if len(database[index].get_kvps().get_key()) == 1 or len(np.unique(database[index].get_kvps().get_key())) == 1:
+                return database[index].get_kvps().get_key()[0]
+
+            # v opacnom pripade prejdeme este deskriptory leaf nodu
+            else:
+                leaf_node_descs = database[index].get_kvps()
+
+                for idx, val in enumerate(leaf_node_descs.get_value()):
+                    dist = abs(np.linalg.norm(val - descriptor))
+
+                    if dist < lowest:
+                        lowest = dist
+                        most_similar_object = leaf_node_descs.get_key()[idx]
+
+            return most_similar_object
+
+
 # starting point
 if __name__ == '__main__':
 
@@ -153,5 +203,11 @@ if __name__ == '__main__':
     database = create_tree()
 
     descriptors = get_query_image_descriptors()
+    print("pocet najdenych deskriptorov pre query image: ", len(descriptors))
+    ## THIS IS JUST DEBUG TODO REMOVE
+    #print(get_closest_node(database, descriptors[0]))
+
+    #for desc in descriptors:
+    #    print(get_closest_node(database, desc))
 
     print("DONE")
