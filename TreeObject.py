@@ -60,7 +60,7 @@ class TreeObject:
     def visit(self):
         self.n += 1
 
-    def get_center_list(self):
+    def get_center(self):
         return self.center
 
     def setup(self, num_of_pics):
