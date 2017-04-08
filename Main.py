@@ -5,6 +5,8 @@ from KeyValuePair import KeyValuePair
 from Pic import Pic
 import numpy as np
 import sys
+from copy import deepcopy
+from collections import Counter
 
 MINIMUM_KEYPOINTS = 10
 NUM_OF_CLUSTERS = 10
@@ -12,13 +14,16 @@ NUM_OF_LEVELS = 3
 NUM_OF_PICS = -1
 QUERY_TREE = []
 
+DB_SIZE = 0
+DB_UNIQUE_ITEMS = []
+
 
 def load_pics():
 
     current_dir = os.getcwd()
 
-    #pics = current_dir + "/pics" TODO Revert
-    pics = current_dir + "/DEBUG_test_images_few"
+    #pics = current_dir + "/DEBUG_test_images_few" TODO Revert
+    pics = current_dir + "/pics"
 
     pic_list = []
 
@@ -88,7 +93,7 @@ def tree_add_node(item):
         path = paths[labels.ravel() == i]
         kvp = KeyValuePair(path, desc)
 
-        item.add_child(TreeObject(kvp, compactness=compactness, label=i, center=center))
+        item.add_child(TreeObject(kvp, compactness=compactness, label=i, center=center[i]))
 
         tree_add_node(item.get_child(i))
 
@@ -126,13 +131,13 @@ def create_tree():
         desc = descriptors[labels.ravel() == i]
         path = paths[labels.ravel() == i]
         kvp = KeyValuePair(path, desc)
-        # TODO center[i]
+
         tree.append(TreeObject(kvp, compactness=compactness, label=i, center=center[i]))
 
     for node in tree:
         tree_add_node(node)
 
-    print('main ends')
+    print('CREATE TREE DONE')
     return tree
 
 
@@ -143,23 +148,21 @@ def get_query_image_descriptors():
 
     return desc
 
-# TODO dokoncit
-def already_in_tree(node, center_list):
-    for center in center_list:
-        if (node.get_center == center).all():
-            return True
 
-    return False
+def create_query_tree(item_list):
 
-# TODO dokoncit
-def copy_to_query_tree(node):
-    global QUERY_TREE
-    if len(QUERY_TREE) == 0:
-        QUERY_TREE.append(node)
-    else:
-        dist = sys.float_info.max
+    if len(item_list) == 0:
+        return
+
+    for idx, item in enumerate(item_list):
+
+        if item.get_num_of_visits() == 0:
+            item_list[idx] = None
+            continue
+        create_query_tree(item.get_child_all())
 
 
+# len pooznacuje visits v databazovych objektoch
 def get_closest_node(database, descriptor):
     most_similar_object = None
     while True:
@@ -167,6 +170,7 @@ def get_closest_node(database, descriptor):
         lowest = sys.float_info.max
         index = -1
 
+        # list 10tich TreeObjectov
         for idx, node in enumerate(database):
             # porovnavam jednotlive centra s deskriptorom
             # a hladam take ktoremu je najblizsi
@@ -174,9 +178,10 @@ def get_closest_node(database, descriptor):
             if dist < lowest:
                 lowest = dist
                 index = idx
-
-        # toto mozno budem robit len pri tvorbe query tree TODO ak ano, odstranit
+                print("navstivil ", str(index))
+        print("lowest ", str(index))
         database[index].visit()
+
         # prechadzame uzly pokial maju deti
         if len(database[index].get_child_all()) != 0:
             database = database[index].get_child_all()
@@ -207,17 +212,63 @@ def get_closest_node(database, descriptor):
     return most_similar_object
 
 
+# DEBUG
+def db_size(db):
+    global DB_SIZE
+
+    if len(db) == 0:
+        return
+
+    for item in db:
+        DB_SIZE += 1
+        if item is None:
+            continue
+        db_size(item.get_child_all())
+
+
+# DEBUG
+def db_unique_items(db):
+    global DB_UNIQUE_ITEMS
+
+    if len(db) == 0:
+        return
+
+    for item in db:
+        if item is None:
+            continue
+
+        for path in item.get_kvps().get_key():
+            DB_UNIQUE_ITEMS.append(path)
+
+        db_unique_items(item.get_child_all())
+
 # starting point
 if __name__ == '__main__':
+
+    global DB_SIZE
 
     database = create_tree()
 
     descriptors = get_query_image_descriptors()
-    print("pocet najdenych deskriptorov pre query image: ", len(descriptors))
-    ## THIS IS JUST DEBUG TODO REMOVE
-    print(get_closest_node(database, descriptors[0]))
 
-    #for desc in descriptors:
-    #    print(get_closest_node(database, desc))
+
+# TODO :Uncomment
+    for desc in descriptors:
+        get_closest_node(database, desc)
+
+    db_copy = deepcopy(database)
+
+    create_query_tree(db_copy)
+
+    db_size(database)
+    print("ORIG DB: " + str(DB_SIZE))
+
+    DB_SIZE = 0
+    db_size(db_copy)
+    print("COPY DB: " + str(DB_SIZE))
+
+    db_unique_items(db_copy)
+    print(Counter(DB_UNIQUE_ITEMS).keys())  # equals to list(set(words))
+    print(Counter(DB_UNIQUE_ITEMS).values())  # counts the elements' frequency
 
     print("DONE")

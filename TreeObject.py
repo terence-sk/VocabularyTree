@@ -50,6 +50,9 @@ class TreeObject:
     def get_child_all(self):
         return self.children
 
+    def kill_children(self):
+        self.children = []
+
     def get_weight(self):
         return self.weight
 
@@ -59,6 +62,9 @@ class TreeObject:
 
     def visit(self):
         self.n += 1
+
+    def get_num_of_visits(self):
+        return self.n
 
     def get_center(self):
         return self.center
