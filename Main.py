@@ -253,8 +253,6 @@ if __name__ == '__main__':
 
     descriptors = get_query_image_descriptors()
 
-
-# TODO :Uncomment
     for desc in descriptors:
         get_closest_node(database, desc)
 

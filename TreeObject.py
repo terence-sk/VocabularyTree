@@ -1,7 +1,6 @@
 from KeyValuePair import KeyValuePair
 import numpy as np
 import math
-from pprint import pprint
 
 
 class TreeObject:
@@ -42,16 +41,14 @@ class TreeObject:
         # node i
         self.n = 0
 
-        self.q_vector = []
-        self.d_vector = []
+        self.q_vector = np.empty((0, 3), dtype=np.float)
+        self.d_vector = np.empty((0, 3), dtype=np.float)
 
         self.parent = None
 
         if children is not None:
             for child in children:
                 self.add_child(child)
-
-
 
     def get_kvps(self):
         return self.kvps
@@ -115,15 +112,16 @@ class TreeObject:
     def query_setup(self):
         self.q = self.n * self.w
 
+        # Only root nodes of query tree, varies from 0 to 10 items
         if self.parent is None:
             print("NO PARENT!!!")
 
-        self.q_vector.append(self.q)
+        self.q_vector = np.append(self.q_vector, self.q)
         if self.parent is not None:
             for item in self.parent.get_q_vector():
-                self.q_vector.append(item)
+                self.q_vector = np.append(self.q_vector, item)
 
-        self.d_vector.append(self.d)
+        self.d_vector = np.append(self.d_vector, self.d)
         if self.parent is not None:
             for item in self.parent.get_d_vector():
-                self.d_vector.append(item)
+                self.d_vector = np.append(self.d_vector, item)
