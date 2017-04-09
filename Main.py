@@ -76,11 +76,11 @@ def get_clustered_data(descs):
 
 def tree_add_node(item):
 
+    item.setup(NUM_OF_PICS)
+
     # Not sure about this one but I'll just let it be here for a while
     if len(item.get_kvps().get_value()) <= 10:
         return
-
-    item.setup(NUM_OF_PICS)
 
     compactness, labels, center = get_clustered_data(item.get_kvps().get_value())
 
@@ -93,7 +93,8 @@ def tree_add_node(item):
         path = paths[labels.ravel() == i]
         kvp = KeyValuePair(path, desc)
 
-        item.add_child(TreeObject(kvp, compactness=compactness, label=i, center=center[i]))
+        # TODO: zistit ci pridavanie parenta nezvysi pamatovu narocnost prilis, lebo toto je velmi jednoduche riesenie
+        item.add_child(TreeObject(kvp, compactness=compactness, label=i, center=center[i]), parent=item)
 
         tree_add_node(item.get_child(i))
 
@@ -159,6 +160,7 @@ def create_query_tree(item_list):
         if item.get_num_of_visits() == 0:
             item_list[idx] = None
             continue
+        item.query_setup()
         create_query_tree(item.get_child_all())
 
 

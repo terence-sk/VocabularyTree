@@ -27,16 +27,31 @@ class TreeObject:
         self.center = center
 
         self.children = []
-        self.kvp_n_of_desc_of_img = []
-        self.weight = 0 # = w
-        self.num_of_all_desc = 0 # = m
+        self.kvp_n_of_desc_of_img = [] # num of descriptors of images separately
 
+        self.w = 0 # = w, weight
+        self.m = 0 # = m, num of all descriptors, of all images combined
         self.d = 0 # = d = m * w
-        self.n = 0 # LEN pri query strome. Pocet deskriptorov ktore presli tymto uzlom
+        self.q = 0 # = q = n * w
+
+        # LEN pri query strome.
+        # Pocet deskriptorov ktore presli tymto uzlom
+        # malo by korespondovat s touto vetou v clanku:
+        # ni is the number of descriptor vectors of the
+        # query with a path through
+        # node i
+        self.n = 0
+
+        self.q_vector = []
+        self.d_vector = []
+
+        self.parent = None
 
         if children is not None:
             for child in children:
                 self.add_child(child)
+
+
 
     def get_kvps(self):
         return self.kvps
@@ -54,11 +69,13 @@ class TreeObject:
         self.children = []
 
     def get_weight(self):
-        return self.weight
+        return self.w
 
-    def add_child(self, node):
+    def add_child(self, node, parent=None):
         assert isinstance(node, TreeObject)
         self.children.append(node)
+        if parent is not None:
+            node.parent = parent
 
     def visit(self):
         self.n += 1
@@ -80,16 +97,33 @@ class TreeObject:
         # kazdy uzol bude mat vahu w = ln(pocet_vsetkych_obrazkov_v_databaze / pocet_obrazkov_ktore_obsahuju_dany_deskriptor)
         # pocet_obrazkov_ktore_obsahuju_dany_deskriptor = malo by to odpovedat pocet obrazkov asociovanych s danym uzlom
         # pocet kvp = pocet obrazkov, kedze je to roztriedene
-        self.weight = math.log(num_of_pics / len(self.kvp_n_of_desc_of_img))
+        self.w = math.log(num_of_pics / len(self.kvp_n_of_desc_of_img))
 
         # kazdy uzol ma m (rovne suctu m kazdeho obrazka) (pocet vsetkych desc)
-        self.num_of_all_desc = len(self.kvps.get_value())
+        self.m = len(self.kvps.get_value())
 
         # na kazdom uzle je mozne po vytvoreni stromu predpocitat d = m * w
         # TODO: m = dufam ze to 'm' ktore je rovne suctu m kazdeho obrazka
-        self.d = self.weight * self.num_of_all_desc
+        self.d = self.m * self.w
 
-    def to_string(self):
-        print("<<<<<<<<<<<<<<")
-        pprint(vars(self))
-        print(">>>>>>>>>>>>>>")
+    def get_q_vector(self):
+        return self.q_vector
+
+    def get_d_vector(self):
+        return self.d_vector
+
+    def query_setup(self):
+        self.q = self.n * self.w
+
+        if self.parent is None:
+            print("NO PARENT!!!")
+
+        self.q_vector.append(self.q)
+        if self.parent is not None:
+            for item in self.parent.get_q_vector():
+                self.q_vector.append(item)
+
+        self.d_vector.append(self.d)
+        if self.parent is not None:
+            for item in self.parent.get_d_vector():
+                self.d_vector.append(item)
