@@ -7,6 +7,7 @@ import numpy as np
 import sys
 from copy import deepcopy
 from collections import Counter
+import time
 
 MINIMUM_KEYPOINTS = 10
 NUM_OF_CLUSTERS = 10
@@ -22,7 +23,6 @@ def load_pics():
 
     current_dir = os.getcwd()
 
-    #pics = current_dir + "/DEBUG_test_images_few" TODO Revert
     pics = current_dir + "/pics"
 
     pic_list = []
@@ -100,12 +100,19 @@ def tree_add_node(item):
 
 
 def create_tree():
+
     # Toto je moj root (Descriptors with paths to corresponding images)
     tree = []
     descriptors = []
     paths = []
 
+    start = time.time()
+
     pics = load_pics()
+
+    print('Pics loaded in ' , time.time() - start , 's')
+
+    start = time.time()
 
     for pic in pics:
         kp, desc = get_keypoint_descriptors_tuple(pic.img)
@@ -119,6 +126,8 @@ def create_tree():
         # aby som vedel ktory deskriptor patri ku ktoremu obrazku
         for i in range(0, len(desc)):
             paths.append(pic.path)
+
+    print('Descriptor retrieval from ',NUM_OF_PICS,' images took ', time.time() - start, 's')
 
     # spoji list x poli (obrazkov) pricom kazde pole obsahuje
     # samo o sebe y descriptorov
@@ -138,7 +147,6 @@ def create_tree():
     for node in tree:
         tree_add_node(node)
 
-    print('CREATE TREE DONE')
     return tree
 
 
@@ -165,7 +173,7 @@ def create_query_tree(item_list):
 
 
 # len pooznacuje visits v databazovych objektoch
-def get_closest_node(database, descriptor):
+def mark_node_visits_in_db(database, descriptor):
     most_similar_object = None
     while True:
 
@@ -180,8 +188,8 @@ def get_closest_node(database, descriptor):
             if dist < lowest:
                 lowest = dist
                 index = idx
-                print("navstivil ", str(index))
-        print("lowest ", str(index))
+                #print("navstivil ", str(index))
+        #print("lowest ", str(index))
         database[index].visit()
 
         # prechadzame uzly pokial maju deti
@@ -249,24 +257,39 @@ if __name__ == '__main__':
 
     global DB_SIZE
 
+    start = time.time()
+
     database = create_tree()
+
+    print("Tree creation took ", time.time() - start, 's')
 
     descriptors = get_query_image_descriptors()
 
+    start = time.time()
+
     for desc in descriptors:
-        get_closest_node(database, desc)
+        mark_node_visits_in_db(database, desc)
+
+    print("Marking visited nodes done in", time.time() - start ,'s')
 
     db_copy = deepcopy(database)
 
+    start = time.time()
+
     create_query_tree(db_copy)
 
+    print("Query tree created in ", time.time() - start, 's')
+
+    # debug
     db_size(database)
     print("ORIG DB: " + str(DB_SIZE))
 
+    # debug
     DB_SIZE = 0
     db_size(db_copy)
     print("COPY DB: " + str(DB_SIZE))
 
+    # debug
     db_unique_items(db_copy)
     print(Counter(DB_UNIQUE_ITEMS).keys())  # equals to list(set(words))
     print(Counter(DB_UNIQUE_ITEMS).values())  # counts the elements' frequency
