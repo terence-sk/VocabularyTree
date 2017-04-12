@@ -1,6 +1,7 @@
 from KeyValuePair import KeyValuePair
 import numpy as np
 import math
+import cv2
 
 
 class TreeObject:
@@ -45,6 +46,9 @@ class TreeObject:
         self.d_vector = np.empty((0, 3), dtype=np.float)
 
         self.parent = None
+
+        # relevance score S
+        self.s = 0.0
 
         if children is not None:
             for child in children:
@@ -125,3 +129,45 @@ class TreeObject:
         if self.parent is not None:
             for item in self.parent.get_d_vector():
                 self.d_vector = np.append(self.d_vector, item)
+
+
+# ak dam alpha 0.1 funguje inac nie, alebo ak dam MIN MAX norm
+#        self.q_vector_normed = cv2.normalize(src=self.q_vector, dst=self.q_vector_normed, alpha=0.0, beta=1.0, norm_type=cv2.NORM_L1, dtype=cv2.CV_32F)
+#        cv2.normalize(self.d_vector, self.d_vector_normed, alpha=0, beta=1, norm_type=cv2.NORM_L1, dtype=cv2.CV_32F)
+
+        self.normalize(self.q_vector)
+        self.normalize(self.d_vector)
+
+        self.compute_relevance_score()
+
+    @staticmethod
+    def normalize(vector):
+
+        pom = 0.0
+        for i in vector:
+            pom += i * i
+
+        length = abs(math.sqrt(pom))
+
+        for idx,_ in enumerate(vector):
+            vector[idx] = vector[idx]/length
+
+    def compute_relevance_score(self):
+        if self.q_vector is None or len(self.q_vector) == 0:
+            print("Missing Q values")
+            return
+
+        if self.d_vector is None or len(self.d_vector) == 0:
+            print("Missing D values")
+            return
+
+        if len(self.d_vector) != len(self.q_vector):
+            print("Q and D lists different lenghts")
+            return
+
+        pom = 0.0
+
+        for i in range(len(self.q_vector)-1):
+            pom += self.q_vector[i]*self.d_vector[i]
+
+        self.s = 1.0 - pom
