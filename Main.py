@@ -1,25 +1,22 @@
 import os
 import cv2
-from TreeObject import TreeObject
-from KeyValuePair import KeyValuePair
-from Pic import Pic
 import numpy as np
 import sys
-from copy import deepcopy
-from collections import Counter
+import operator
 import time
-import pickle
+from copy import deepcopy
 from PIL import Image
+from KeyValuePair import KeyValuePair
+from TreeObject import TreeObject
+from Pic import Pic
 
-MINIMUM_KEYPOINTS = 10
+
 NUM_OF_CLUSTERS = 10
-NUM_OF_LEVELS = 3
 NUM_OF_PICS = -1
-QUERY_TREE = []
-
-DB_UNIQUE_ITEMS = []
 
 PICTURE_SCORES = []
+LEAF_NODES = []
+DB_SIZE = 0
 
 
 def load_pics():
@@ -64,14 +61,10 @@ def get_clustered_data(descs):
     # 1.0 = accuracy
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
 
-    # Kolko tych clustrov vlastne ma byt..?
-    # -- run k means up to 6 levels - pustim k means, mam x clustrov, nad tymi x clustrami zase k means
-    # a takto to spravim max 6 krat
-    # branch factor je odporucany na 10
-
     # center = list of x arrays of length 128 - descriptors of cluster centers
     # compactness = It is the sum of squared distance from each point to their corresponding centers.
     # label = Label of keypoint to which cluster does keypoint belong
+    # K = Branch factor in this case
     compactness, labels, centers = cv2.kmeans(data=descs, K=NUM_OF_CLUSTERS, bestLabels=None, criteria=criteria, attempts=10,
                                       flags=cv2.KMEANS_RANDOM_CENTERS)
 
@@ -82,7 +75,6 @@ def tree_add_node(item):
 
     item.setup(NUM_OF_PICS)
 
-    # Not sure about this one but I'll just let it be here for a while
     if len(item.get_kvps().get_value()) <= 10:
         return
 
@@ -97,7 +89,6 @@ def tree_add_node(item):
         path = paths[labels.ravel() == i]
         kvp = KeyValuePair(path, desc)
 
-        # TODO: zistit ci pridavanie parenta nezvysi pamatovu narocnost prilis, lebo toto je velmi jednoduche riesenie
         item.add_child(TreeObject(kvp, compactness=compactness, label=i, center=center[i]), parent=item)
 
         tree_add_node(item.get_child(i))
@@ -114,7 +105,7 @@ def create_tree():
 
     pics = load_pics()
 
-    print('Pics loaded in ' , time.time() - start , 's')
+    print('Pics loaded in ' ,time.time() - start, 's')
 
     start = time.time()
 
@@ -209,7 +200,6 @@ def get_result(query_tree):
 
 # len pooznacuje visits v databazovych objektoch
 def mark_node_visits_in_db(database, descriptor):
-    most_similar_object = None
     while True:
 
         highest = sys.float_info.min
@@ -230,34 +220,60 @@ def mark_node_visits_in_db(database, descriptor):
         # prechadzame uzly pokial maju deti
         if len(database[index].get_child_all()) != 0:
             database = database[index].get_child_all()
-            # dosiahli sme leaf node
-            # uzol uz deti nema, ale moze mat viac ako jeden descriptor
-            # toto je z toho dovodu ze pri tvorbe stromu som sa snazil
-            # aby bolo najmenej 10 KVP na uzol, no niekedy je ich aj menej...
-            # tuto dilemu riesi skorovanie, tu som to riesil len hladanim najblizsieho
-            # descriptora k centru
-
-        # --- IRELEVANTNY TEST, TOTO V ALGORITME ORIGINAL NIE JE  ---
         else:
-            highest = sys.float_info.min
+            break
 
-            # ak ostal uz len jeden KVP alebo su vsetky KVP z jedneho obrazku, mozme rovno vratit jeho nazov
-            if len(database[index].get_kvps().get_key()) == 1 or len(np.unique(database[index].get_kvps().get_key())) == 1:
-                return database[index].get_kvps().get_key()[0]
 
-            # v opacnom pripade prejdeme este deskriptory leaf nodu
-            else:
-                leaf_node_descs = database[index].get_kvps()
+def get_leaf_nodes(tree):
+    if len(tree) == 0:
+        return
 
-                for idx, val in enumerate(leaf_node_descs.get_value()):
-                    dist = np.dot(val, descriptor)
+    for item in tree:
+        if item is None:
+            continue
+        if len(item.get_child_all()) == 0:
+            LEAF_NODES.append(item)
+        else:
+            tree = item.get_child_all()
+            get_leaf_nodes(tree)
 
-                    if dist > highest:
-                        highest = dist
-                        most_similar_object = leaf_node_descs.get_key()[idx]
-                break
 
-    return most_similar_object
+def compute_img_scores(tree):
+    get_leaf_nodes(tree)
+    for item in LEAF_NODES:
+
+        TreeObject.normalize(item.vector_query_visits_counts)
+        TreeObject.normalize(item.vector_img_kvp_counts[0].get_values())
+
+        for img in item.vector_img_kvp_counts:
+            TreeObject.normalize(img.get_values())
+
+            for pic in PICTURE_SCORES:
+                if pic.get_key() == img.get_key():
+                    pic.set_value(pic.get_value() + TreeObject.compute_relevance_score_vztah3(item.vector_query_visits_counts, img.get_values()))
+                    #pic.set_value(pic.get_value() + TreeObject.compute_relevance_score_vztah6(item.vector_query_visits_counts,img.get_values()))
+
+    my_dict = {}
+    for pic in PICTURE_SCORES:
+        my_dict[pic.get_key()] = pic.get_value()
+
+    my_dict = (sorted(my_dict.items(), key=operator.itemgetter(1)))
+
+    for key in my_dict:
+        print(key[0], ' scored ', key[1])
+
+
+def db_size(db):
+    global DB_SIZE
+
+    if len(db) == 0:
+        return
+
+    for item in db:
+        DB_SIZE += 1
+        if item is None:
+            continue
+        db_size(item.get_child_all())
 
 
 if __name__ == '__main__':
@@ -291,27 +307,26 @@ if __name__ == '__main__':
     print("Query tree created in ", time.time() - start, 's')
 
 # ---------------
-
-    #compute_img_scores()
-
-# ---------------
     start = time.time()
+    # sposob1, zly
+    #get_result(db_copy)
 
-    get_result(db_copy)
+    # sposob2
+    compute_img_scores(db_copy)
+
+    db_size(db_copy)
+    print(DB_SIZE)
 
     print("Result found in ", time.time() - start, 's')
 
     highest = 0
     name = None
     for kvp in PICTURE_SCORES:
-        if kvp.get_value() > 0:
-            print(kvp.get_key())
-            print(kvp.get_value())
-            print("---------")
+        if kvp.get_value() > highest:
+            highest = kvp.get_value()
+            name = kvp.get_key()
 
-            if kvp.get_value() > highest:
-                highest = kvp.get_value()
-                name = kvp.get_key()
+    print(name, highest)
 
     current_dir = os.getcwd()
     pics = current_dir + "/pics/"

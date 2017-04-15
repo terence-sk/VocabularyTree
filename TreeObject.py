@@ -53,6 +53,7 @@ class TreeObject:
         self.s = 0.0
 
         self.vector_img_kvp_counts = []
+        self.vector_query_visits_counts = []
 
         if children is not None:
             for child in children:
@@ -149,6 +150,12 @@ class TreeObject:
                     if kvpl.get_key() == item.get_key():
                         kvpl.add_value(item.get_values())
 
+        self.vector_query_visits_counts.append(self.n)
+
+        if self.parent is not None:
+            for item in self.parent.vector_query_visits_counts:
+                self.vector_query_visits_counts.append(item)
+
     @staticmethod
     def normalize(vector):
 
@@ -180,3 +187,21 @@ class TreeObject:
             pom += self.q_vector[i]*self.d_vector[i]
         # TODO: aky ma zmysel skore ked ratam len pocty deskriptorov?
         self.s = 1.0 - pom
+
+    @staticmethod
+    def compute_relevance_score_vztah6(vector1, vector2):
+        pom = 0.0
+
+        for i in range(len(vector1)):
+            pom += vector1[i] * vector2[i]
+
+        return 1.0-pom
+
+    @staticmethod
+    def compute_relevance_score_vztah3(vector1, vector2):
+        result = np.subtract(vector1, vector2)
+        pom = 0.0
+        for i in result:
+            pom += i
+
+        return 1-pom
