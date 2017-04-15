@@ -8,6 +8,8 @@ import sys
 from copy import deepcopy
 from collections import Counter
 import time
+import pickle
+from PIL import Image
 
 MINIMUM_KEYPOINTS = 10
 NUM_OF_CLUSTERS = 10
@@ -15,8 +17,9 @@ NUM_OF_LEVELS = 3
 NUM_OF_PICS = -1
 QUERY_TREE = []
 
-DB_SIZE = 0
 DB_UNIQUE_ITEMS = []
+
+PICTURE_SCORES = []
 
 
 def load_pics():
@@ -30,6 +33,7 @@ def load_pics():
     for filename in os.listdir(pics):
         img = cv2.imread(pics + "/" + filename, cv2.IMREAD_GRAYSCALE)
         pic_list.append(Pic(filename, img))
+        PICTURE_SCORES.append(KeyValuePair(filename, 0))
 
     global NUM_OF_PICS
     NUM_OF_PICS = len(pic_list)
@@ -63,9 +67,9 @@ def get_clustered_data(descs):
     # Kolko tych clustrov vlastne ma byt..?
     # -- run k means up to 6 levels - pustim k means, mam x clustrov, nad tymi x clustrami zase k means
     # a takto to spravim max 6 krat
-    # TODO: branch factor je odporucany na 10 ale to este neviem ako ovplyvnim
+    # branch factor je odporucany na 10
 
-    # center = list of 6 arrays of length 128 - descriptors of cluster centers
+    # center = list of x arrays of length 128 - descriptors of cluster centers
     # compactness = It is the sum of squared distance from each point to their corresponding centers.
     # label = Label of keypoint to which cluster does keypoint belong
     compactness, labels, centers = cv2.kmeans(data=descs, K=NUM_OF_CLUSTERS, bestLabels=None, criteria=criteria, attempts=10,
@@ -101,7 +105,7 @@ def tree_add_node(item):
 
 def create_tree():
 
-    # Toto je moj root (Descriptors with paths to corresponding images)
+    # Toto je root
     tree = []
     descriptors = []
     paths = []
@@ -151,9 +155,11 @@ def create_tree():
 
 
 def get_query_image_descriptors():
-    query_path = os.getcwd() + "/query_pic/query_tux_iny_tux.jpg"
+    query_path = os.getcwd() + "/query_pic/query.jpg"
     query_img = cv2.imread(query_path, cv2.IMREAD_GRAYSCALE)
     kp, desc = get_keypoint_descriptors_tuple(query_img)
+
+    print("We are looking for a picture named: ", query_path)
 
     return desc
 
@@ -172,24 +178,53 @@ def create_query_tree(item_list):
         create_query_tree(item.get_child_all())
 
 
+# Pokus c 1. nefunguje , len ak dam hladat taky obrazok ktory uz v db je
+def get_result(query_tree):
+
+    # prechadzam strom pokym sa nedostanem na taky uzol
+    # ktory uz nema deti === leaf node, popritom ratam
+    # kolko descriptorov mal po ceste query aj obrazok (tvorim vector)
+    for node in query_tree:
+        if node is None:
+            continue
+
+        if len(node.get_child_all()) != 0:
+            get_result(node.get_child_all())
+        else:
+            values_vector = []
+            keys_vector = []
+            for kvp in node.kvp_n_of_desc_of_img:
+                values_vector.append(kvp.get_value())
+                keys_vector.append(kvp.get_key())
+
+                values_vector = [int(i) for i in values_vector]
+
+            TreeObject.normalize(values_vector)
+
+            for key, norm_value in zip(keys_vector, values_vector):
+                item = KeyValuePair.get_item_if_in_list(PICTURE_SCORES, key)
+                if item is not None:
+                    item.set_value(item.get_value() + norm_value)
+
+
 # len pooznacuje visits v databazovych objektoch
 def mark_node_visits_in_db(database, descriptor):
     most_similar_object = None
     while True:
 
-        lowest = sys.float_info.max
+        highest = sys.float_info.min
         index = -1
 
         # list 10tich TreeObjectov
         for idx, node in enumerate(database):
             # porovnavam jednotlive centra s deskriptorom
-            # a hladam take ktoremu je najblizsi
-            dist = abs(np.linalg.norm(node.get_center() - descriptor))
-            if dist < lowest:
-                lowest = dist
+            # skalarny sucin(dot product), hlada najvacsiu hodnotu,
+            # nie euclidean distance a najmensiu ako povodne
+            dist = np.dot(node.get_center(), descriptor)
+            if dist > highest:
+                highest = dist
                 index = idx
-                #print("navstivil ", str(index))
-        #print("lowest ", str(index))
+
         database[index].visit()
 
         # prechadzame uzly pokial maju deti
@@ -199,9 +234,12 @@ def mark_node_visits_in_db(database, descriptor):
             # uzol uz deti nema, ale moze mat viac ako jeden descriptor
             # toto je z toho dovodu ze pri tvorbe stromu som sa snazil
             # aby bolo najmenej 10 KVP na uzol, no niekedy je ich aj menej...
-            # nechcem to uz riesit necham to tak
+            # tuto dilemu riesi skorovanie, tu som to riesil len hladanim najblizsieho
+            # descriptora k centru
+
+        # --- IRELEVANTNY TEST, TOTO V ALGORITME ORIGINAL NIE JE  ---
         else:
-            lowest = sys.float_info.max
+            highest = sys.float_info.min
 
             # ak ostal uz len jeden KVP alebo su vsetky KVP z jedneho obrazku, mozme rovno vratit jeho nazov
             if len(database[index].get_kvps().get_key()) == 1 or len(np.unique(database[index].get_kvps().get_key())) == 1:
@@ -212,56 +250,26 @@ def mark_node_visits_in_db(database, descriptor):
                 leaf_node_descs = database[index].get_kvps()
 
                 for idx, val in enumerate(leaf_node_descs.get_value()):
-                    dist = abs(np.linalg.norm(val - descriptor))
+                    dist = np.dot(val, descriptor)
 
-                    if dist < lowest:
-                        lowest = dist
+                    if dist > highest:
+                        highest = dist
                         most_similar_object = leaf_node_descs.get_key()[idx]
                 break
 
     return most_similar_object
 
 
-# DEBUG
-def db_size(db):
-    global DB_SIZE
-
-    if len(db) == 0:
-        return
-
-    for item in db:
-        DB_SIZE += 1
-        if item is None:
-            continue
-        db_size(item.get_child_all())
-
-
-# DEBUG
-def db_unique_items(db):
-    global DB_UNIQUE_ITEMS
-
-    if len(db) == 0:
-        return
-
-    for item in db:
-        if item is None:
-            continue
-
-        for path in item.get_kvps().get_key():
-            DB_UNIQUE_ITEMS.append(path)
-
-        db_unique_items(item.get_child_all())
-
-# starting point
 if __name__ == '__main__':
 
-    global DB_SIZE
+# ---------------
 
     start = time.time()
 
     database = create_tree()
 
     print("Tree creation took ", time.time() - start, 's')
+# ---------------
 
     descriptors = get_query_image_descriptors()
 
@@ -272,6 +280,8 @@ if __name__ == '__main__':
 
     print("Marking visited nodes done in", time.time() - start ,'s')
 
+# ---------------
+
     db_copy = deepcopy(database)
 
     start = time.time()
@@ -280,18 +290,34 @@ if __name__ == '__main__':
 
     print("Query tree created in ", time.time() - start, 's')
 
-    # debug
-    db_size(database)
-    print("ORIG DB: " + str(DB_SIZE))
+# ---------------
 
-    # debug
-    DB_SIZE = 0
-    db_size(db_copy)
-    print("COPY DB: " + str(DB_SIZE))
+    #compute_img_scores()
 
-    # debug
-    db_unique_items(db_copy)
-    print(Counter(DB_UNIQUE_ITEMS).keys())  # equals to list(set(words))
-    print(Counter(DB_UNIQUE_ITEMS).values())  # counts the elements' frequency
+# ---------------
+    start = time.time()
+
+    get_result(db_copy)
+
+    print("Result found in ", time.time() - start, 's')
+
+    highest = 0
+    name = None
+    for kvp in PICTURE_SCORES:
+        if kvp.get_value() > 0:
+            print(kvp.get_key())
+            print(kvp.get_value())
+            print("---------")
+
+            if kvp.get_value() > highest:
+                highest = kvp.get_value()
+                name = kvp.get_key()
+
+    current_dir = os.getcwd()
+    pics = current_dir + "/pics/"
+
+    img = Image.open(pics+name)
+    img.show()
+
 
     print("DONE")

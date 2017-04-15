@@ -1,4 +1,5 @@
 from KeyValuePair import KeyValuePair
+from KeyValuePairList import KeyValuePairList
 import numpy as np
 import math
 import cv2
@@ -29,6 +30,7 @@ class TreeObject:
         self.children = []
         self.kvp_n_of_desc_of_img = [] # num of descriptors of images separately
 
+
         self.w = 0 # = w, weight
         self.m = 0 # = m, num of all descriptors, of all images combined
         self.d = 0 # = d = m * w
@@ -49,6 +51,8 @@ class TreeObject:
 
         # relevance score S
         self.s = 0.0
+
+        self.vector_img_kvp_counts = []
 
         if children is not None:
             for child in children:
@@ -91,7 +95,6 @@ class TreeObject:
 
         # kazdy uzol vie pre kazdy obrazok pocet vsetkych deskriptorov toho obrazku
         paths, counts = np.asarray(np.unique(self.kvps.get_key(), return_counts=True))
-
         for i in range(0, len(paths)):
             self.kvp_n_of_desc_of_img.append(KeyValuePair(paths[i], counts[i]))
 
@@ -107,6 +110,10 @@ class TreeObject:
         # TODO: m = dufam ze to 'm' ktore je rovne suctu m kazdeho obrazka
         self.d = self.m * self.w
 
+        if self.parent is None:
+            for item in self.kvp_n_of_desc_of_img:
+                self.vector_img_kvp_counts.append(KeyValuePairList(item.get_key(), item.get_value()))
+
     def get_q_vector(self):
         return self.q_vector
 
@@ -115,10 +122,6 @@ class TreeObject:
 
     def query_setup(self):
         self.q = self.n * self.w
-
-        # Only root nodes of query tree, varies from 0 to 10 items
-        if self.parent is None:
-            print("NO PARENT!!!")
 
         self.q_vector = np.append(self.q_vector, self.q)
         if self.parent is not None:
@@ -130,15 +133,21 @@ class TreeObject:
             for item in self.parent.get_d_vector():
                 self.d_vector = np.append(self.d_vector, item)
 
-
-# ak dam alpha 0.1 funguje inac nie, alebo ak dam MIN MAX norm
-#        self.q_vector_normed = cv2.normalize(src=self.q_vector, dst=self.q_vector_normed, alpha=0.0, beta=1.0, norm_type=cv2.NORM_L1, dtype=cv2.CV_32F)
-#        cv2.normalize(self.d_vector, self.d_vector_normed, alpha=0, beta=1, norm_type=cv2.NORM_L1, dtype=cv2.CV_32F)
-
         self.normalize(self.q_vector)
         self.normalize(self.d_vector)
 
+        # TODO: naco to vobec pocitam ked potom robim aj tak s poctami descriptorov
+        # ktore normalizujem?
         self.compute_relevance_score()
+
+        if self.parent is not None:
+            for item in self.kvp_n_of_desc_of_img:
+                self.vector_img_kvp_counts.append(KeyValuePairList(item.get_key(), item.get_value()))
+
+            for item in self.parent.vector_img_kvp_counts:
+                for kvpl in self.vector_img_kvp_counts:
+                    if kvpl.get_key() == item.get_key():
+                        kvpl.add_value(item.get_values())
 
     @staticmethod
     def normalize(vector):
@@ -169,5 +178,5 @@ class TreeObject:
 
         for i in range(len(self.q_vector)-1):
             pom += self.q_vector[i]*self.d_vector[i]
-
+        # TODO: aky ma zmysel skore ked ratam len pocty deskriptorov?
         self.s = 1.0 - pom
