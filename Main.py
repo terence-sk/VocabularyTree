@@ -10,7 +10,8 @@ from KeyValuePair import KeyValuePair
 from TreeObject import TreeObject
 from Pic import Pic
 
-
+VISITS = 0
+VISIT_DESCS = 0
 NUM_OF_CLUSTERS = 10
 NUM_OF_PICS = -1
 
@@ -276,6 +277,21 @@ def db_size(db):
         db_size(item.get_child_all())
 
 
+def bruteforce(database, descriptor):
+    global VISITS
+    global VISIT_DESCS
+    for item in database:
+        VISITS += 1
+        for desc in item.get_kvps().get_value():
+            VISIT_DESCS += 1
+            if np.allclose(desc, descriptor, atol=62):
+                print("BF FOUND:", item.get_kvps().get_key())
+        if len(item.get_child_all()) != 0:
+            database = item.get_child_all()
+            bruteforce(database, descriptor)
+
+
+
 if __name__ == '__main__':
 
 # ---------------
@@ -288,6 +304,19 @@ if __name__ == '__main__':
 # ---------------
 
     descriptors = get_query_image_descriptors()
+
+    db_size(database)
+    print("velkost db ", DB_SIZE)
+
+    DB_SIZE = 0
+
+    start = time.time()
+
+    bruteforce(database, descriptors[0])
+    print("pocet navstev nodov: ", VISITS)
+    print("pocet navstev descs: ", VISIT_DESCS)
+
+    print("Bruteforce done in: ", time.time() - start)
 
     start = time.time()
 
