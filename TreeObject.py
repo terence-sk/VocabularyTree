@@ -52,7 +52,12 @@ class TreeObject:
         # relevance score S
         self.s = 0.0
 
+        # IMG KVP = Vektor ktory obsahuje pocty descriptorov
+        # daneho obrazku po ceste stromom dolu
         self.vector_img_kvp_counts = []
+
+        # vektor ktory obsahuje pocty query descriptorov
+        # ktore navstivili dany uzol, pozri query setup
         self.vector_query_visits_counts = []
 
         if children is not None:
