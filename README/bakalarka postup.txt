@@ -1,0 +1,17 @@
+- je vytvoreny strom z naucenych obrazkov
+  - kazdy uzol ma zoznam odpovedajucich obrazkov (ktore maju deskriptor opisovany uzlom)
+  - kazdy uzol vie pre kazdy obrazok pocet vsetkych deskriptorov toho obrazku => m
+  - kazdy uzol bude mat vahu w = ln(pocet_vsetkych_obrazkov_v_databaze / pocet_obrazkov_ktore_obsahuju_dany_deskriptor)      ??? malo by to odpovedat pocet obrazkov asociovanych s danym uzlom
+  - kazdy uzol ma m (rovne suctu m kazdeho obrazka)
+  - na kazdom uzle je mozne po vytvoreni stromu predpocitat d = m * w
+  - d by sa malo normalizovat na jednotkovu velkost
+- mame dotazovany obrazok, vyhladame v nom kp a spravime deskriptory
+- po jednom berieme deskriptory z dotazovaneho obrazku, a prechadzame na zaklade tohto deskriptora strom:
+  - medzi korenovymi uzlami najdeme najblizsi a presunieme sa nan
+  - toto opakujeme pre poduzly az dojdeme na spodok stromu (k listu)
+  - postupne takto vytvarame uplne novy strom pre dopyt
+- po vytvoreni stromu dotazu:
+  - kazdy uzol ma n rovne poctu deskriptorov, ktore sli cez dany uzol
+  - pre kazdy uzol sa vyrataju hodnoty q = n * w
+  - pre kazdu cestu je mozne zostrojit vektor z hodnot q (resp. d) v ceste; kazdy vektor q potom normalizovat na jednotkovu velkost
+- pre kazdu cestu v novom strome sa vyrata s(q, d)    [resp. pomocou vztahu 6]
